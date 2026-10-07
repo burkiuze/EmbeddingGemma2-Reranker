@@ -1,4 +1,0 @@
-chore: remove stray commit message file from the repository root
-
-.commitmsg was a local build artifact used to pass the commit message to
-git and must not be tracked. It is now listed in .gitignore.
