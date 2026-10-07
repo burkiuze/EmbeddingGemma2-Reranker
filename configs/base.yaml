@@ -1,0 +1,94 @@
+# Base configuration: verified EmbeddingGemma 2 text-tower defaults.
+# Every value under `backbone` matches google/embeddinggemma-2's config.json and
+# must not be changed to inflate parameter counts. See docs/source_model_analysis.md.
+
+pooling: mean
+calibration: sigmoid
+
+backbone:
+  model_name_or_path: google/embeddinggemma-2
+  dtype: float32
+  device: cpu
+  # Verified upstream text-tower dimensions.
+  hidden_size: 512
+  embedding_dim: 768
+  num_hidden_layers: 24
+  # null means "use the last transformer layer".
+  hidden_layer_ids: null
+  # The 270M text tag needs neither vision nor audio.
+  load_vision_tower: false
+  load_audio_tower: false
+
+fusion:
+  interaction_type: elementwise
+  fusion_dim: 512
+  dropout: 0.1
+  layer_norm_features: true
+  activation: gelu
+
+interaction:
+  # Token-level cross-attention is opt-in: it costs O(Tq * Td).
+  enabled: false
+  num_heads: 4
+  projection_dim: 256
+  max_query_tokens: 64
+  max_document_tokens: 256
+  dropout: 0.1
+  use_max_pool: true
+  normalize_tokens: true
+
+reranker_layers:
+  hidden_dim: 512
+  num_layers: 2
+  intermediate_dim: 1024
+  dropout: 0.1
+  activation: gelu
+  layer_norm_eps: 1.0e-6
+
+heads:
+  relevance_hidden_dim: 256
+  relevance_dropout: 0.1
+  confidence_head: true
+  confidence_hidden_dim: 256
+  confidence_dropout: 0.1
+
+chunking:
+  enabled: true
+  max_tokens: 512
+  max_chunks: 8
+  aggregation: max
+  top_k: 3
+  stride: 0
+
+policy:
+  # All null means abstention never triggers. Set thresholds per deployment.
+  minimum_relevance: null
+  minimum_margin: null
+  minimum_confidence: null
+
+prompts:
+  # Upstream asymmetric prefixes; disabling them is possible but reduces quality.
+  query: "task: search result | query: "
+  document: "title: none | text: "
+  enabled: true
+
+training:
+  train_mode: reranker_only
+  loss: pairwise_margin
+  margin: 0.1
+  listwise_temperature: 1.0
+  distillation_weight: 0.0
+  learning_rate: 2.0e-5
+  head_learning_rate: 1.0e-4
+  weight_decay: 0.01
+  epochs: 1
+  batch_size: 4
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  warmup_ratio: 0.1
+  seed: 42
+  num_negatives: 1
+  max_query_length: 64
+  max_document_length: 256
+  log_every: 10
+  output_dir: runs/base

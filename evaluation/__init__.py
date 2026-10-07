@@ -1,0 +1,71 @@
+"""Evaluation utilities for the EmbeddingGemma 2 reranker."""
+
+from .baseline import (
+    BaselineResult,
+    BiEncoderBaseline,
+    compare_against_reranker,
+    format_comparison,
+)
+from .calibration import (
+    abstention_report,
+    brier_score,
+    calibration_curve,
+    confidence_from_tensor,
+    evaluate_confidence,
+    expected_calibration_error,
+    negative_log_likelihood,
+    top_margin_from_scores,
+)
+from .evaluate import (
+    DEFAULT_KS,
+    evaluate_and_write,
+    evaluate_reranker,
+    format_report,
+    grade_to_binary,
+    load_checkpoint,
+)
+from .metrics import (
+    average_precision,
+    bootstrap_ci,
+    dcg_at_k,
+    evaluate_rankings,
+    hits_at_k,
+    ndcg_at_k,
+    pairwise_accuracy,
+    precision_at_k,
+    recall_at_k,
+    reciprocal_rank,
+    top1_accuracy,
+)
+
+__all__ = [
+    "DEFAULT_KS",
+    "BaselineResult",
+    "BiEncoderBaseline",
+    "abstention_report",
+    "average_precision",
+    "bootstrap_ci",
+    "brier_score",
+    "calibration_curve",
+    "compare_against_reranker",
+    "confidence_from_tensor",
+    "dcg_at_k",
+    "evaluate_and_write",
+    "evaluate_confidence",
+    "evaluate_rankings",
+    "evaluate_reranker",
+    "expected_calibration_error",
+    "format_comparison",
+    "format_report",
+    "grade_to_binary",
+    "hits_at_k",
+    "load_checkpoint",
+    "negative_log_likelihood",
+    "ndcg_at_k",
+    "pairwise_accuracy",
+    "precision_at_k",
+    "recall_at_k",
+    "reciprocal_rank",
+    "top1_accuracy",
+    "top_margin_from_scores",
+]

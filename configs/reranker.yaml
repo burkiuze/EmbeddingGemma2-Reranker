@@ -1,0 +1,46 @@
+# Learned reranker: the default architecture.
+# Fusion + interaction + reranker layers + relevance/confidence heads.
+#
+# This is the PRIMARY implementation. The cosine bi-encoder baseline lives in
+# evaluation/baseline.py and exists only for comparison.
+
+base: base.yaml
+
+fusion:
+  # Q, D, Q*D, |Q-D| -> learned projection. The classic four-feature set.
+  interaction_type: elementwise
+  fusion_dim: 512
+
+interaction:
+  # Stronger mode: document tokens attend to query tokens.
+  # Enable only when queries are short; cost is O(Tq * Td).
+  enabled: false
+
+reranker_layers:
+  hidden_dim: 512
+  num_layers: 2
+  intermediate_dim: 1024
+  dropout: 0.1
+
+heads:
+  relevance_hidden_dim: 256
+  confidence_head: true
+
+chunking:
+  enabled: true
+  aggregation: max
+
+policy:
+  # Deliberately permissive defaults. Tighten for your deployment once you have
+  # measured how the trained head's scores are distributed.
+  minimum_relevance: null
+  minimum_margin: null
+  minimum_confidence: null
+
+training:
+  train_mode: reranker_only
+  loss: pairwise_margin
+  margin: 0.1
+  learning_rate: 2.0e-5
+  head_learning_rate: 1.0e-4
+  output_dir: runs/reranker

@@ -1,0 +1,44 @@
+# Training hyperparameters. Architecture settings come from reranker.yaml.
+
+base: reranker.yaml
+
+training:
+  train_mode: reranker_only
+  loss: pairwise_margin
+  margin: 0.1
+
+  epochs: 3
+  batch_size: 8
+  gradient_accumulation_steps: 2
+  max_grad_norm: 1.0
+  warmup_ratio: 0.1
+  weight_decay: 0.01
+  seed: 42
+
+  learning_rate: 2.0e-5
+  head_learning_rate: 1.0e-4
+
+  num_negatives: 2
+  max_query_length: 64
+  max_document_length: 256
+
+  log_every: 20
+  eval_every: 0
+  save_every: 0
+
+  # Set to a non-empty path before using train_mode: full.
+  output_dir: runs/training
+
+# To use listwise training instead:
+#   loss: listwise
+#   listwise_temperature: 1.0
+#
+# To use BCE on binary labels:
+#   loss: bce
+#
+# To distil from externally supplied teacher scores (`teacher_scores` in JSONL):
+#   distillation_weight: 0.5
+#
+# Full fine-tuning is never selected automatically. It requires BOTH:
+#   training.train_mode: full
+#   and an explicit --allow-full-finetune flag.

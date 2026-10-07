@@ -1,0 +1,19 @@
+# LoRA fine-tuning: reranker modules + low-rank adapters on the backbone.
+#
+# Requires: pip install peft
+# Without PEFT installed, train_mode=lora degrades to reranker_only and the run
+# log records lora_degraded=true. It never silently pretends adapters were added.
+
+base: reranker.yaml
+
+training:
+  train_mode: lora
+  learning_rate: 1.0e-4
+  head_learning_rate: 1.0e-4
+  weight_decay: 0.01
+  lora_r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  # null selects these defaults.
+  lora_target_modules: null
+  output_dir: runs/lora

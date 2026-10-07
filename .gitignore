@@ -1,0 +1,123 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Model weights and checkpoints — NEVER commit these
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf
+*.onnx
+*.h5
+*.msgpack
+pytorch_model*.bin
+model.safetensors
+*.mlmodel
+blobs/
+manifests/
+
+# Ollama artifacts
+.ollama/
+ollama/
+
+# Hugging Face cache
+.cache/
+.huggingface/
+hf_cache/
+transformers_cache/
+
+# Training outputs
+runs/
+outputs/
+checkpoints/
+wandb/
+lightning_logs/
+tensorboard/
+*.log
+train_log.jsonl
+
+# Datasets — no dataset is committed to this repository
+data/
+!data/sample/
+datasets/
+*.jsonl.gz
+*.parquet
+*.arrow
+
+# Secrets — never commit credentials
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.yaml
+token
+tokens
+*_token
+.github_token
+.netrc
+.huggingface/token
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Testing / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+htmlcov/
+
+# Harness-internal tooling (not part of the project)
+.gitshim/
+.gitshim*/
+_fetch.py
+_bootstrap.py
+setuptool.py
+probe.sh
+runx
+run_tool
+gt
+dl
+px
+setup
+setupdeps
+get
+env.sh
+.fetch_target
+.fetch_host
+.fetch_path
+.pkgs
+
+# Temp
+*.tmp
+*.temp
+tmp/
+temp/

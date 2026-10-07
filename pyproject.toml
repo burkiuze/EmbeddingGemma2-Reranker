@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "embeddinggemma2-reranker"
+version = "0.1.0"
+description = "Neural cross-encoder reranker built on Google's EmbeddingGemma 2 270M text tower"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "burkiuze" }]
+keywords = [
+    "reranking",
+    "cross-encoder",
+    "retrieval",
+    "embeddings",
+    "embeddinggemma",
+    "gemma",
+    "information-retrieval",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.1",
+    "transformers>=5.0.0",
+    "sentencepiece>=0.1.99",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+lora = ["peft>=0.9.0"]
+dev = ["pytest>=7.4"]
+all = ["peft>=0.9.0", "pytest>=7.4"]
+
+[project.urls]
+Homepage = "https://github.com/burkiuze/EmbeddingGemma2-Reranker"
+Source = "https://github.com/burkiuze/EmbeddingGemma2-Reranker"
+Issues = "https://github.com/burkiuze/EmbeddingGemma2-Reranker/issues"
+
+[tool.setuptools]
+packages = ["embeddinggemma_reranker", "training", "evaluation"]
+
+[tool.setuptools.package-data]
+embeddinggemma_reranker = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: marks tests that would require downloading real model weights",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
