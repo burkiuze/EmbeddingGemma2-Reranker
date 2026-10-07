@@ -121,3 +121,7 @@ env.sh
 *.temp
 tmp/
 temp/
+
+# Local build artifacts
+.commitmsg
+.pushmsg
