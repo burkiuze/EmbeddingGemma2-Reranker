@@ -37,6 +37,9 @@ class RerankedResult:
     chunked: bool = False
     num_chunks: int = 1
 
+    def __getitem__(self, key: str) -> Any:
+        return self.to_dict()[key]
+
     def to_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
             "index": self.index,
@@ -199,19 +202,38 @@ class EmbeddingGemma2RerankerInference:
     ) -> Dict[int, List[str]]:
         """Return ``{document_index: chunks}``, flagging anything that was split."""
         prepared: Dict[int, List[str]] = {}
+        self._truncated_documents = []
+        prefix = self.config.prompts.apply_document("")
+        overhead = len(_extract_ids(self.model.backbone.tokenizer(prefix)))
+        # The stub represents empty input with one token, unlike real tokenizers.
+        if not prefix and getattr(self.model.backbone, "_stub", False):
+            overhead = 0
+        max_tokens = min(self.config.chunking.max_tokens, self.config.training.max_document_length - overhead)
+        if max_tokens <= 0:
+            raise ValueError("document token budget must exceed prompt and special-token overhead")
         if not self.config.chunking.enabled:
             for index, document in enumerate(documents):
                 prepared[index] = [document]
+                formatted = self.config.prompts.apply_document(document)
+                if len(_extract_ids(self.model.backbone.tokenizer(formatted))) > self.config.training.max_document_length:
+                    self._truncated_documents.append(index)
             return prepared
 
         for index, document in enumerate(documents):
             prepared[index] = chunk_document(
                 document,
                 self.model.backbone.tokenizer,
-                max_tokens=self.config.chunking.max_tokens,
+                max_tokens=max_tokens,
                 max_chunks=self.config.chunking.max_chunks,
                 stride=self.config.chunking.stride,
             )
+            length = len(_extract_ids(self.model.backbone.tokenizer(document, add_special_tokens=False)))
+            step = max_tokens - max(0, self.config.chunking.stride)
+            if step <= 0:
+                step = max_tokens
+            capacity = max_tokens + (self.config.chunking.max_chunks - 1) * step
+            if length > capacity:
+                self._truncated_documents.append(index)
         return prepared
 
     # -------------------------------------------------------------- scoring
@@ -275,9 +297,7 @@ class EmbeddingGemma2RerankerInference:
         ]
         score_tensor = torch.tensor(document_scores, dtype=torch.float32)
 
-        ranking = build_ranking(
-            score_tensor, document_ids if document_ids is not None else list(range(len(documents)))
-        )
+        ranking = build_ranking(score_tensor)
 
         # Confidence operates on the document-level ranking representations. Pick
         # the representation belonging to each document's best chunk.
@@ -285,9 +305,9 @@ class EmbeddingGemma2RerankerInference:
         document_representations = output.representations[best_slot].unsqueeze(0)
 
         confidence_value: Optional[float] = None
-        if include_confidence and self.model.confidence_head is not None:
+        if include_confidence:
             logits = self.model.confidence(
-                output.representations[best_slot], document_scores_tensor(score_tensor)
+                output.representations[best_slot], score_tensor.to(output.representations.device)
             )
             confidence_value = float(torch.sigmoid(logits).item())
 
@@ -307,11 +327,8 @@ class EmbeddingGemma2RerankerInference:
 
         results: List[RerankedResult] = []
         for position, item in enumerate(ranking["ranking"]):
-            index = item["index"]
-            # ``index`` is a document_id when supplied, so map back by position.
-            position_in_input = (
-                documents.index(documents[0]) if False else _position_of(index, document_ids, documents)
-            )
+            position_in_input = item["index"]
+            index = document_ids[position_in_input] if document_ids is not None else position_in_input
             chunk_list = chunks[position_in_input]
             results.append(
                 RerankedResult(
@@ -329,6 +346,7 @@ class EmbeddingGemma2RerankerInference:
                     else None,
                     chunked=len(chunk_list) > 1,
                     num_chunks=len(chunk_list),
+                    confidence=confidence_value,
                 )
             )
 
@@ -338,7 +356,7 @@ class EmbeddingGemma2RerankerInference:
             results = results[:top_k]
 
         elapsed = time.perf_counter() - started
-        truncated = [i for i, c in chunks.items() if len(c) > 1]
+        truncated = self._truncated_documents
 
         return RerankResponse(
             query=query,

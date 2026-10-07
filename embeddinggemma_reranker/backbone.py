@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from .config import BackboneConfig, ConfigError
 from .pooling import pool
@@ -153,6 +154,11 @@ class EmbeddingGemma2TextBackbone(nn.Module):
                 "one transformer layer output"
             )
 
+        # Transformers appends the final projected 768-d output to the captured
+        # 512-d transformer states. Fusion consumes pre-projection token states.
+        hidden_states = tuple(state for state in hidden_states if state.shape[-1] == self.hidden_size)
+        if not hidden_states:
+            raise ConfigError("backbone exposed no pre-projection token hidden states")
         requested = self.config.hidden_layer_ids
         if requested is None:
             chosen = [len(hidden_states) - 1]
@@ -205,7 +211,7 @@ class EmbeddingGemma2TextBackbone(nn.Module):
         if not bool(mask_bool.any(dim=-1).all()):
             raise ValueError("every sequence must contain at least one attended token")
 
-        pooled_native = self._native_embedding(raw)
+        pooled_native = self._native_embedding(raw, attention_mask)
         if output_hidden:
             hidden_tuple = getattr(raw, "hidden_states", None)
             if hidden_tuple is None:
@@ -234,15 +240,12 @@ class EmbeddingGemma2TextBackbone(nn.Module):
     def set_pooling_mode(self, mode: str) -> None:
         self._pooling_mode = mode
 
-    def _native_embedding(self, raw: Any) -> torch.Tensor:
+    def _native_embedding(self, raw: Any, attention_mask: torch.Tensor) -> torch.Tensor:
         """Extract the upstream 768-d embedding, mean-pooled and L2-normalized."""
         for attr in ("last_hidden_state", "pooler_output", "last_hidden_states"):
             value = getattr(raw, attr, None)
             if isinstance(value, torch.Tensor) and value.dim() == 3:
-                mask = getattr(raw, "attention_mask", None)
-                if mask is None:
-                    mask = torch.ones(value.shape[:2], dtype=torch.long)
-                pooled = pool(value, mask.to(torch.bool), "mean")
+                pooled = pool(value, attention_mask.to(torch.bool), "mean")
                 return F.normalize(pooled, p=2.0, dim=-1)
         if hasattr(raw, "get_input_embeddings"):
             # Last resort: embed ids directly. Keeps shape contracts intact for
@@ -352,14 +355,20 @@ class _StubTokenizer:
     def __init__(self, vocab_size: int = 512) -> None:
         self.vocab_size = vocab_size
 
-    def __call__(self, texts, max_length: int = 32, **_kwargs):
-        if isinstance(texts, str):
+    def __call__(self, texts, max_length=None, truncation=False, return_tensors=None, **_kwargs):
+        single = isinstance(texts, str)
+        if single:
             texts = [texts]
         batch = []
         for text in texts:
             ids = [min(ord(ch) % (self.vocab_size - 1), self.vocab_size - 2) for ch in text]
-            ids = ids[:max_length] or [1]
+            if truncation and max_length is not None:
+                ids = ids[:max_length]
+            ids = ids or [1]
             batch.append(ids)
+        if return_tensors != "pt":
+            ids = batch[0] if single else batch
+            return {"input_ids": ids}
         width = max(len(ids) for ids in batch)
         input_ids = torch.zeros(len(batch), width, dtype=torch.long)
         attention_mask = torch.zeros(len(batch), width, dtype=torch.long)
@@ -367,6 +376,9 @@ class _StubTokenizer:
             input_ids[row, : len(ids)] = torch.tensor(ids, dtype=torch.long)
             attention_mask[row, : len(ids)] = 1
         return {"input_ids": input_ids, "attention_mask": attention_mask}
+
+    def decode(self, ids, skip_special_tokens=True):
+        return "".join(chr(int(token)) for token in ids if not skip_special_tokens or token != 0)
 
 
 # ``BackboneConfig`` has no vocab_size field; the stub needs one number.

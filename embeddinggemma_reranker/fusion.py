@@ -60,7 +60,7 @@ class QueryDocumentFusion(nn.Module):
 
         multiplier = self._feature_multiplier()
         self.fusion_proj = nn.Sequential(
-            nn.Linear(output_dim * multiplier, output_dim),
+            nn.Linear(2 * output_dim + 1 if interaction_type == "dot" else output_dim * multiplier, output_dim),
             _activations().get(activation, nn.GELU)(),
             nn.Dropout(dropout),
             nn.Linear(output_dim, output_dim),
@@ -115,9 +115,6 @@ class QueryDocumentFusion(nn.Module):
             # Keep the per-feature geometry: cosine plus the two operands.
             cosine = F.cosine_similarity(q, d, dim=-1, eps=1e-8).unsqueeze(-1)
             features = torch.cat([cosine, q, d], dim=-1)
-            # ``dot`` advertises a single feature but cosine+q+d is strictly more
-            # informative; the projection absorbs the width.
-            self.fusion_proj[0] = nn.Linear(self.output_dim * 3, self.output_dim)
         else:  # pragma: no cover - guarded by config validation
             raise ValueError(f"unsupported interaction_type {self.interaction_type!r}")
 

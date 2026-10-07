@@ -67,6 +67,7 @@ def load_model():
 
 def main() -> int:
     model, is_stub = load_model()
+    print("WARNING: reranker heads are untrained; ranking quality has not been evaluated.")
     baseline = BiEncoderBaseline(model)
     reranker = EmbeddingGemma2RerankerInference(model)
 

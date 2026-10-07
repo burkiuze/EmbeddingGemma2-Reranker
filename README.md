@@ -24,6 +24,10 @@ EMBEDDINGGEMMA 2 TEXT BACKBONE        (frozen, unchanged, 270M)
 > No trained checkpoint ships with this repository. Nothing here claims an
 > improvement over EmbeddingGemma retrieval — see [Current Status](#current-status).
 
+This copy includes runtime and training fixes; see [FIXES.md](FIXES.md) for
+verification commands and the changes. Model weights are downloaded from Hugging
+Face on first use and are not bundled with the source archive.
+
 ---
 
 ## Overview
@@ -62,8 +66,8 @@ was actually observed:
 |---|---|---|
 | Text hidden size | 512 | `text_config.hidden_size` |
 | Text output dim | 768 | `text_config.embedding_dim` |
-| Layers | 24 (5 sliding + 19 full, with per-layer overrides at 5/11/17/23) | `text_config.layer_types` |
-| Attention heads / KV heads | 8 / 2 | `text_config` |
+| Layers | 24 (20 sliding + 4 full, with per-layer overrides at 5/11/17/23) | `text_config.layer_types` |
+| Attention heads / KV heads | 4 / 2 | `text_config` |
 | Head dim | 256 (512 on 4 layers) | `head_dim`, `per_layer_config` |
 | FFN / activation | 2048 / `gelu_pytorch_tanh` | `text_config` |
 | Norm | RMSNorm, eps 1e-6 | `rms_norm_eps` |

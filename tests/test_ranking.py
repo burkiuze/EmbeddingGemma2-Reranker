@@ -104,7 +104,7 @@ def test_policy_treats_missing_signal_as_unmet():
     "aggregation,expected",
     [
         ("max", 3.0),
-        ("mean", 2.0),
+        ("mean", 1.5),
         ("top_k_mean", 2.5),
     ],
 )

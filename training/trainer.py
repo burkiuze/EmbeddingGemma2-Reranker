@@ -148,8 +148,8 @@ def _attach_lora(model: EmbeddingGemma2Reranker) -> None:
     )
     peft_model = get_peft_model(model.backbone.model, lora_config)
     model.backbone.model = peft_model
-    for param in peft_model.parameters():
-        param.requires_grad = "lora" in param.name
+    for name, param in peft_model.named_parameters():
+        param.requires_grad = "lora" in name
 
 
 @dataclass
@@ -269,15 +269,24 @@ class RerankerTrainer:
             batch.query_input_ids, batch.query_attention_mask
         )
         documents = batch.flatten_documents()
+        valid = batch.document_mask.flatten()
+        documents = {key: value[valid] for key, value in documents.items()}
         document_output = self.model.backbone(**documents)
 
         batch_size, num_candidates = batch.document_mask.shape
-        pair_queries = _repeat_backbone(query_output, batch_size * num_candidates)
+        from embeddinggemma_reranker.backbone import BackboneOutput
+        rows = torch.arange(batch_size, device=valid.device).repeat_interleave(num_candidates)[valid]
+        pair_queries = BackboneOutput(
+            token_hidden=query_output.token_hidden[rows],
+            pooled=query_output.pooled[rows],
+            embedding=None if query_output.embedding is None else query_output.embedding[rows],
+            attention_mask=query_output.attention_mask[rows],
+            num_hidden_layers=query_output.num_hidden_layers,
+        )
         output = self.model.score_pairs(pair_queries, document_output)
 
-        scores = output.scores.reshape(batch_size, num_candidates)
-        neutral = scores.detach().mean()
-        return torch.where(batch.document_mask, scores, neutral)
+        scores = output.scores.new_zeros(batch_size * num_candidates)
+        return scores.masked_scatter(valid, output.scores).reshape(batch_size, num_candidates)
 
     def loss_for(
         self, batch: RerankerBatch, scores: torch.Tensor
@@ -314,7 +323,7 @@ class RerankerTrainer:
             drop_last=False,
         )
 
-        total_steps = max(1, len(loader) * self.training.epochs)
+        total_steps = math.ceil(len(loader) / self.training.gradient_accumulation_steps) * self.training.epochs
         self._scheduler = self._make_scheduler(total_steps)
 
         self.model.train()
@@ -339,10 +348,12 @@ class RerankerTrainer:
                         f"{float(output.loss)}"
                     )
 
-                loss = output.loss / self.training.gradient_accumulation_steps
+                group_start = (index // self.training.gradient_accumulation_steps) * self.training.gradient_accumulation_steps
+                group_size = min(self.training.gradient_accumulation_steps, len(loader) - group_start)
+                loss = output.loss / group_size
                 loss.backward()
 
-                if (index + 1) % self.training.gradient_accumulation_steps == 0:
+                if (index + 1) % self.training.gradient_accumulation_steps == 0 or index + 1 == len(loader):
                     self._optimizer_step()
                     step += 1
                     if self._scheduler is not None:

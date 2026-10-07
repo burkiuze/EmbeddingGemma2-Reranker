@@ -58,10 +58,10 @@ def pairwise_margin_loss(
     device = scores.device
 
     if mask is None:
-        mask = relevance > 0
+        mask = torch.ones_like(relevance, dtype=torch.bool)
     mask = mask.to(torch.bool)
 
-    positives = torch.triu(mask.unsqueeze(2) & (~mask).unsqueeze(1), diagonal=1)
+    positives = (relevance.unsqueeze(2) > relevance.unsqueeze(1)) & mask.unsqueeze(2) & mask.unsqueeze(1)
     num_pairs = int(positives.sum().item())
     if num_pairs == 0:
         zero = scores.sum() * 0.0
@@ -132,12 +132,12 @@ def listwise_loss(
         raise ValueError(f"temperature must be positive, got {temperature}")
 
     if mask is None:
-        mask = relevance > 0
+        mask = torch.ones_like(relevance, dtype=torch.bool)
     mask = mask.to(torch.bool)
 
     neg_inf = torch.finfo(scores.dtype).min
     masked_scores = scores.masked_fill(~mask, neg_inf)
-    masked_relevance = relevance.masked_fill(~mask, 0.0)
+    masked_relevance = relevance.masked_fill(~mask, neg_inf)
 
     log_p = F.log_softmax(masked_scores / temperature, dim=-1)
     target = F.softmax(masked_relevance / temperature, dim=-1)
@@ -202,7 +202,7 @@ def distillation_kl_loss(
 
     neg_inf = torch.finfo(scores.dtype).min
     masked_scores = scores.masked_fill(~mask, neg_inf) / temperature
-    masked_teacher = teacher_scores.masked_fill(~mask, 0.0) / temperature
+    masked_teacher = teacher_scores.masked_fill(~mask, neg_inf) / temperature
 
     log_p = F.log_softmax(masked_scores, dim=-1)
     target = F.softmax(masked_teacher, dim=-1)

@@ -244,7 +244,7 @@ Truncation is always reported. A long document is never silently clipped.
 |---|---|
 | Text tower hidden size (512) | no |
 | Text tower layer count (24) | no |
-| Attention heads (8) / KV heads (2) | no |
+| Attention heads (4) / KV heads (2) | no |
 | Vocabulary (262 144) | no |
 | Tokenizer | no |
 | Vision / audio encoders | not loaded |

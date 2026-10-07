@@ -206,8 +206,7 @@ def confidence_from_scores(scores: torch.Tensor, num_documents: int) -> torch.Te
         return torch.ones(scores.shape[:-1], device=scores.device, dtype=scores.dtype)
     sorted_scores, _ = torch.sort(scores, dim=-1, descending=True)
     margin = sorted_scores[..., 0] - sorted_scores[..., 1]
-    spread = scores.std(dim=-1, unbiased=False).clamp(min=1e-6)
-    return torch.sigmoid(margin / spread)
+    return torch.sigmoid(margin)
 
 
 def confidence_report(

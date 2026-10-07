@@ -90,7 +90,7 @@ Read from `https://huggingface.co/google/embeddinggemma-2/raw/main/config.json`:
     "embedding_dim": 768,
     "head_dim": 256,
     "num_hidden_layers": 24,
-    "num_attention_heads": 8,
+    "num_attention_heads": 4,
     "num_key_value_heads": 2,
     "intermediate_size": 2048,
     "hidden_activation": "gelu_pytorch_tanh",
@@ -136,11 +136,12 @@ Read from `https://huggingface.co/google/embeddinggemma-2/raw/main/config.json`:
 - `embedding_dim: 768` is the **output** width. The text tower therefore *projects*
   512 → 768 somewhere near the top. That projection is the reason the published
   embedding is 768-dimensional even though the transformer body is 512-wide.
-- `num_attention_heads: 8` × `head_dim: 256` = **2048** inner attention width
+- `num_attention_heads: 4` × `head_dim: 256` = **1024** inner attention width
   (wider than `hidden_size`, which is normal for these decoupled-dim designs).
-- `num_key_value_heads: 2` → grouped-query attention with 4 query heads per KV head.
+- `num_key_value_heads: 2` → grouped-query attention with 2 query heads per KV head.
 - 4 of the 24 layers (`05`, `11`, `17`, `23`) override to `head_dim: 512` /
-  `num_key_value_heads: 1`, i.e. a narrower, cheaper attention stack every 6 layers.
+  `num_key_value_heads: 1`. These are the four full-attention layers; the other
+  twenty layers use sliding attention.
 
 ### 1.3 Official model card — parameter breakdown
 
@@ -358,7 +359,7 @@ when no candidate clears the thresholds.
 | Text layers | 24 | verified |
 | Text hidden size | 512 | verified |
 | Text output dim | 768 | verified |
-| Attention heads / KV heads | 8 / 2 | verified |
+| Attention heads / KV heads | 4 / 2 | verified |
 | Head dim | 256 (512 on layers 5/11/17/23) | verified |
 | FFN size | 2048 | verified |
 | Activation | `gelu_pytorch_tanh` | verified |

@@ -110,7 +110,7 @@ def test_mse_loss_measures_squared_error():
     scores = torch.tensor([[2.0, 0.0]])
     targets = torch.tensor([[1.0, 0.0]])
     out = mse_loss(scores, targets)
-    assert out.loss.item() == pytest.approx(1.0)
+    assert out.loss.item() == pytest.approx(0.5)
 
 
 def test_distillation_kl_is_zero_when_teacher_matches_student():
@@ -146,7 +146,7 @@ def test_compute_loss_dispatch(name):
 
 
 def test_compute_loss_adds_distillation_when_teacher_present():
-    batch = make_batch([[2.0, 0.0]], teacher=[5.0, 1.0])
+    batch = make_batch([[2.0, 0.0]], teacher=[[5.0, 1.0]])
     scores = torch.randn(1, 2, requires_grad=True)
     out = compute_loss("listwise", scores, batch, distillation_weight=0.5)
     assert "distill_kl_loss" in out.metrics

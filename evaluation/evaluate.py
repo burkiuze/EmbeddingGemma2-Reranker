@@ -40,7 +40,7 @@ def _query_inputs(
     for example in examples:
         queries.append(example.query)
         document_lists.append(list(example.documents))
-        relevances.append(grade_to_binary(example.relevance))
+        relevances.append(list(example.relevance))
     return queries, document_lists, relevances
 
 
@@ -78,10 +78,9 @@ def evaluate_reranker(
         if model.confidence_head is not None:
             from .calibration import top_margin_from_scores
 
-            best_slot = int(order[0])
             confidence_logits = model.confidence(
-                output.representations[best_slot].unsqueeze(0),
-                output.scores.unsqueeze(0),
+                output.representations,
+                output.scores,
             )
             confidence = float(torch.sigmoid(confidence_logits).item())
             confidences.append(confidence)
@@ -118,6 +117,7 @@ def evaluate_reranker(
         report["baseline"] = comparison["baseline"]
         report["deltas"] = comparison["deltas"]
         report["baseline_wall_seconds"] = comparison["baseline_wall_seconds"]
+        report["reranker_wall_seconds"] = comparison["reranker_wall_seconds"]
 
     return report
 
@@ -143,7 +143,9 @@ def format_report(report: Dict[str, Any], ks: Sequence[int] = DEFAULT_KS) -> str
         lines.append("")
         lines.append("Baseline (EmbeddingGemma cosine) vs reranker")
         lines.append(format_comparison(
-            {"baseline": report["baseline"], "reranker": reranker, "deltas": report["deltas"], "num_queries": reranker.get("num_queries", 0)},
+            {"baseline": report["baseline"], "reranker": reranker, "deltas": report["deltas"], "num_queries": reranker.get("num_queries", 0),
+             "baseline_wall_seconds": report["baseline_wall_seconds"],
+             "reranker_wall_seconds": report["reranker_wall_seconds"]},
             ["mrr", "map", "top1_accuracy"] + [f"ndcg@{k}" for k in ks],
         ))
 

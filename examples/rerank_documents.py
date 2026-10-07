@@ -29,6 +29,7 @@ def load_model():
     try:
         model = build_reranker(RerankerConfig())
         print(f"loaded {RerankerConfig().backbone.model_name_or_path}")
+        print("WARNING: reranker heads are untrained; these rankings do not measure relevance quality.")
         return model
     except Exception as exc:
         print(f"could not load the real checkpoint ({exc})")

@@ -92,16 +92,27 @@ class EncoderBase(nn.Module):
         if not texts:
             raise ValueError("cannot encode an empty list of texts")
 
-        if use_cache:
+        if use_cache and not self.training and not torch.is_grad_enabled():
+            if len(texts) != 1:
+                return self._encode_uncached(list(texts), titles)
             missing = [t for t in texts if self._cache_key(t) not in self._cache]
             if missing:
                 fresh = self._encode_uncached(missing, titles)
-                for text, out in zip(missing, fresh):
-                    self._cache[self._cache_key(text)] = out
+                for index, text in enumerate(missing):
+                    self._cache[self._cache_key(text)] = BackboneOutput(
+                        token_hidden=fresh.token_hidden[index:index + 1],
+                        pooled=fresh.pooled[index:index + 1],
+                        embedding=None if fresh.embedding is None else fresh.embedding[index:index + 1],
+                        attention_mask=fresh.attention_mask[index:index + 1],
+                        num_hidden_layers=fresh.num_hidden_layers,
+                    )
             outputs = [self._cache[self._cache_key(t)] for t in texts]
             return _stack_outputs(outputs)
 
         return self._encode_uncached(list(texts), titles)
+
+    def forward(self, texts, titles=None, use_cache=False) -> BackboneOutput:
+        return self.encode(texts, titles=titles, use_cache=use_cache)
 
     def _encode_uncached(
         self,
@@ -120,9 +131,8 @@ class EncoderBase(nn.Module):
             truncation=True,
             return_tensors="pt",
         )
-        if isinstance(batch, dict):
-            return batch
-        return dict(batch)
+        return {key: value.to(self.backbone.device) for key, value in dict(batch).items()
+                if key in ("input_ids", "attention_mask")}
 
 
 class QueryEncoder(EncoderBase):
@@ -181,7 +191,8 @@ class EmbeddingGemma2Reranker(nn.Module):
             self.backbone, self.config.prompts, self.config.training.max_document_length
         )
 
-        self.backbone_hidden = self.backbone.hidden_size
+        layer_count = len(self.config.backbone.hidden_layer_ids or [0])
+        self.backbone_hidden = self.backbone.hidden_size * layer_count
         self.native_embedding_dim = self.backbone.embedding_dim
 
         self.fusion = QueryDocumentFusion.from_config(
@@ -216,6 +227,15 @@ class EmbeddingGemma2Reranker(nn.Module):
                 self.reranker.output_dim, self.config.heads
             )
         self._total_extra = total_extra
+        if self.config.training.train_mode != "full":
+            self.backbone.requires_grad_(False)
+        self.backbone.set_pooling_mode(self.config.pooling)
+        if self.config.training.train_mode == "head_only":
+            self.fusion.requires_grad_(False)
+            self.reranker.requires_grad_(False)
+            if self.token_interaction is not None:
+                self.token_interaction.requires_grad_(False)
+        self.to(self.config.backbone.device)
 
     # ---------------------------------------------------------- properties
     @property
@@ -274,7 +294,8 @@ class EmbeddingGemma2Reranker(nn.Module):
                 f"{document_output.pooled.shape[0]} documents"
             )
 
-        fused = self.fusion(query_output.pooled, document_output.pooled)
+        reranker_dtype = self.fusion.query_proj.weight.dtype
+        fused = self.fusion(query_output.pooled.to(reranker_dtype), document_output.pooled.to(reranker_dtype))
         extras: List[torch.Tensor] = []
 
         if self.token_interaction is not None:
@@ -285,10 +306,10 @@ class EmbeddingGemma2Reranker(nn.Module):
                     "encode with output_hidden=True"
                 )
             token_out = self.token_interaction(
-                query_output.token_hidden,
-                document_output.token_hidden,
-                query_mask=query_output.attention_mask,
-                document_mask=document_output.attention_mask,
+                query_output.token_hidden[:, :self.config.interaction.max_query_tokens].to(reranker_dtype),
+                document_output.token_hidden[:, :self.config.interaction.max_document_tokens].to(reranker_dtype),
+                query_mask=query_output.attention_mask[:, :self.config.interaction.max_query_tokens],
+                document_mask=document_output.attention_mask[:, :self.config.interaction.max_document_tokens],
             )
             extras.append(token_out["token_context"])
             if return_details:
@@ -358,9 +379,9 @@ class EmbeddingGemma2Reranker(nn.Module):
 
             return confidence_from_scores(
                 scores.reshape(1, -1), num_documents=scores.shape[0]
-            ).squeeze(0)
+            ).reshape(1)
         batched = representations.unsqueeze(0)
-        return self.confidence_head(batched, scores.reshape(1, -1)).squeeze(0)
+        return self.confidence_head(batched, scores.reshape(1, -1)).reshape(1)
 
 
 def _repeat_backbone(output: BackboneOutput, times: int) -> BackboneOutput:

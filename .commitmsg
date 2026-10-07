@@ -1,0 +1,18 @@
+fix: correct runtime and training defects found during verification
+
+Fixes the working bugs listed in FIXES.md: missing test package __init__ and
+encoder forward(), absent torch.nn.functional import, stale computation graph
+leaking through the query cache, 768-d native projection versus 512-d token
+states separation, dot-fusion width rebuilt on every call, token-interaction
+dimensions and padding masks, confidence dimensions for two-candidate lists,
+chunking tokenizer handling and truncation reporting, duplicate document ids in
+results, order-independent graded relevance in the pairwise loss, padding
+excluded from listwise and distillation targets, ragged-batch encoding, default
+backbone freezing, LoRA named-parameter checks, and the final optimizer step on
+gradient accumulation.
+
+Also corrects the upstream text attention head count in the docs to 4.
+
+Verified with Python 3.12.14, PyTorch 2.14.1+cpu, Transformers 5.19.0,
+pytest 9.1.1: 140 tests pass, smoke training passes, and all three inference
+examples run against the real google/embeddinggemma-2 backbone.
